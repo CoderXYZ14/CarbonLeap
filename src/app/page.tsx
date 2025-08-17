@@ -1,103 +1,216 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useRef } from "react";
+import { Activity, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import axios from "axios";
+import Link from "next/link";
+import { toast } from "sonner";
+
+interface UploadStatus {
+  type: "idle" | "loading" | "success" | "error";
+  message: string;
+  count?: number;
+}
+
+export default function HomePage() {
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>({
+    type: "idle",
+    message: "",
+  });
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0]);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!file.name.endsWith(".json")) {
+      setUploadStatus({ type: "error", message: "Please upload a JSON file" });
+      toast.error("Please upload a JSON file");
+      return;
+    }
+
+    try {
+      setUploadStatus({ type: "loading", message: "Processing file..." });
+
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      const response = await axios.post("/api/sensor", data);
+
+      setUploadStatus({
+        type: "success",
+        message: "Data uploaded successfully!",
+        count: response.data.count,
+      });
+
+      toast.success(
+        `Successfully uploaded ${response.data.count} sensor readings!`,
+        {
+          action: {
+            label: "View Dashboard",
+            onClick: () => (window.location.href = "/dashboard"),
+          },
+          duration: 5000,
+        }
+      );
+    } catch (error) {
+      console.error("Upload | Error:", error);
+      setUploadStatus({
+        type: "error",
+        message: "Failed to upload data. Please check your file format.",
+      });
+      toast.error("Failed to upload data. Please check your file format.");
+    }
+  };
+
+  const clearUpload = () => {
+    setUploadStatus({ type: "idle", message: "" });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b border-gray-200">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-3">
+              <Activity className="h-6 w-6 text-blue-600" />
+              <span className="text-lg font-semibold text-gray-900">
+                Field Insights
+              </span>
+            </div>
+            <Link
+              href="/dashboard"
+              className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              Dashboard
+            </Link>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </nav>
+
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center mb-12">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Upload Sensor Data
+          </h1>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Upload your farm sensor data in JSON format to get instant analytics
+            and insights
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+          <div
+            className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
+              dragActive
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-300 hover:border-gray-400"
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+
+            <div className="space-y-4">
+              <FileText className="h-16 w-16 text-gray-400 mx-auto" />
+              <div>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Choose JSON File
+                </button>
+                <p className="text-sm text-gray-500 mt-2">
+                  or drag and drop here
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {uploadStatus.type !== "idle" && (
+            <div
+              className={`mt-6 p-4 rounded-lg flex items-center space-x-3 ${
+                uploadStatus.type === "success"
+                  ? "bg-green-50 text-green-800"
+                  : uploadStatus.type === "error"
+                  ? "bg-red-50 text-red-800"
+                  : "bg-blue-50 text-blue-800"
+              }`}
+            >
+              {uploadStatus.type === "success" && (
+                <CheckCircle className="h-5 w-5" />
+              )}
+              {uploadStatus.type === "error" && (
+                <AlertCircle className="h-5 w-5" />
+              )}
+              {uploadStatus.type === "loading" && (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              )}
+              <div className="flex-1">
+                <p className="font-medium">{uploadStatus.message}</p>
+                {uploadStatus.count && (
+                  <p className="text-sm opacity-75">
+                    {uploadStatus.count} sensor readings processed
+                  </p>
+                )}
+              </div>
+              <div className="flex space-x-2">
+                {uploadStatus.type === "success" && (
+                  <Link
+                    href="/dashboard"
+                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                  >
+                    View Dashboard
+                  </Link>
+                )}
+                {uploadStatus.type !== "loading" && (
+                  <button
+                    onClick={clearUpload}
+                    className="text-sm underline hover:no-underline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
